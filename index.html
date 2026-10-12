@@ -603,7 +603,7 @@ function updateQr(total){
  const box=$("qrcode");box.innerHTML="";
  const upi=clean($("upiId").value),payee=clean($("payeeName").value)||"Arakodi Marinations";
  $("previewUpi").textContent=upi||"Enter UPI ID in configuration";$("previewPayee").textContent=payee;
- if(!upi){box.innerHTML='<div style="font-size:10px;color:#9a806b;text-align:center">UPI QR<br>appears here</div>';return}
+ if(!upi){box.innerHTML='<div style="font-size:10px;color:#c63d31;text-align:center">Enter UPI ID<br>above to<br>show QR</div>';return}
  if(typeof QRCode==="undefined"){box.innerHTML='<div style="font-size:10px;color:#9a806b;text-align:center">QR library unavailable</div>';return}
  new QRCode(box,{text:`upi://pay?pa=${encodeURIComponent(upi)}&pn=${encodeURIComponent(payee)}&am=${total.toFixed(2)}&cu=INR&tn=${encodeURIComponent("Arakodi Marinations Order")}`,width:96,height:96,correctLevel:QRCode.CorrectLevel.M});
 }
@@ -618,6 +618,14 @@ function updatePreview(){
  $("previewRows").innerHTML=d.rows.length?d.rows.map(r=>`<tr><td><strong>${esc(r.name)}</strong></td><td>${formatKg(r.kg)}</td><td>${money(r.rate)}</td><td><strong>${money(r.amount)}</strong></td></tr>`).join(""):'<tr><td class="empty-row" colspan="4">Add items to generate the bill.</td></tr>';
  $("previewSubtotal").textContent=money(d.subtotal);$("previewPrevious").textContent=money(d.previous);$("previewGrandTotal").textContent=money(d.grandTotal);
  $("previewPreviousRow").style.display=d.previous>0?"flex":"none";updateQr(d.grandTotal);saveSettings();
+ scheduleBillImage();
+}
+/* Pre-render the bill image so Share runs instantly (phones cancel share if it waits too long after the tap) */
+let billBlobCache=null,billBlobKey="",billBlobTimer=null;
+function previewKey(){return $("billCard").innerText+"|"+($("qrcode").querySelector("img")?.src||"")}
+function scheduleBillImage(){
+ billBlobCache=null;clearTimeout(billBlobTimer);
+ billBlobTimer=setTimeout(async()=>{try{const k=previewKey(),b=await renderBillBlob();if(k===previewKey()){billBlobCache=b;billBlobKey=k}}catch{}},800);
 }
 function resetBill(){
  state.currentBillNo=makeBillNo();state.billLines=[];$("customerName").value="";$("customerPhone").value="";$("includePrevious").checked=false;$("previousBalance").value=0;$("previousBalanceWrap").style.display="none";$("paymentStatus").value="Paid";addBillLine();updatePreview();toast("New bill ready.");
@@ -632,7 +640,11 @@ function saveBill(){
  state.bills.unshift(bill);saveDB();renderHistory();updateDashboard();toast("Bill saved to records.");resetBill();
 }
 async function billBlob(){
- updatePreview();if(typeof html2canvas==="undefined")throw new Error("Image library unavailable. Connect to internet and reload.");
+ if(billBlobCache&&billBlobKey===previewKey())return billBlobCache;
+ return renderBillBlob();
+}
+async function renderBillBlob(){
+ if(typeof html2canvas==="undefined")throw new Error("Image library unavailable. Connect to internet and reload.");
  const canvas=await html2canvas($("billCard"),{scale:Math.min(3,Math.max(2,devicePixelRatio||2)),backgroundColor:"#fff",useCORS:true,logging:false});
  return await new Promise((res,rej)=>canvas.toBlob(b=>b?res(b):rej(new Error("Could not create image")),"image/png",1));
 }
@@ -643,12 +655,16 @@ async function shareBill(){
  const d=billData();if(!d.rows.length)return toast("Add at least one item.");
  try{
   const b=await billBlob(),f=new File([b],`Arakodi-Bill-${state.currentBillNo}.png`,{type:"image/png"}),text=`Arakodi Marinations bill: ${money(d.grandTotal)}. Scan the UPI QR in the attached bill to pay.`;
-  if(navigator.canShare&&navigator.canShare({files:[f]})&&navigator.share){await navigator.share({title:"Arakodi Marinations Bill",text,files:[f]});return}
-  const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1200);
+  if(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]})){
+   try{await navigator.share({title:"Arakodi Marinations Bill",text,files:[f]});return}
+   catch(e){if(e.name==="AbortError")return;console.warn("Share sheet failed, using WhatsApp link",e)}
+  }
+  const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);
   let p=clean($("customerPhone").value).replace(/\D/g,"");
-  if(!p)return toast("Enter the customer contact number before sharing.");
   if(p.length===10)p="91"+p;
-  window.location.href=`https://wa.me/${p}?text=${encodeURIComponent(text+"\n\nAttach the downloaded bill image.")}`;
+  const wa=`https://wa.me/${p}?text=${encodeURIComponent(text+"\n\nAttach the downloaded bill image.")}`;
+  toast("Bill image downloaded. Attach it in WhatsApp.");
+  setTimeout(()=>{if(!window.open(wa,"_blank"))window.location.href=wa},600);
  }catch(e){if(e.name!=="AbortError")toast(e.message)}
 }
 
