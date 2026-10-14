@@ -651,10 +651,27 @@ async function renderBillBlob(){
 async function downloadImage(){
  try{const b=await billBlob(),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=`Arakodi-Bill-${state.currentBillNo}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);toast("Bill image downloaded.")}catch(e){toast(e.message)}
 }
+function payLink(total){
+ const upi=clean($("upiId").value);if(!upi)return "";
+ const u=new URL("pay.html",location.href);u.search="";u.hash="";
+ u.searchParams.set("pa",upi);
+ u.searchParams.set("pn",clean($("payeeName").value)||"Arakodi Marinations");
+ u.searchParams.set("am",total.toFixed(2));
+ u.searchParams.set("bill",state.currentBillNo);
+ return u.toString();
+}
+function shareMessage(d){
+ const biz=clean($("businessName").value)||"Arakodi Marinations",upi=clean($("upiId").value),link=payLink(d.grandTotal);
+ const lines=[`*${biz}*`,`Bill No: ${state.currentBillNo}`,`Amount: *${money(d.grandTotal)}*`];
+ if(link)lines.push("",`Tap to pay by UPI: ${link}`,`UPI ID: ${upi}`);
+ lines.push("","Thank you!");
+ return lines.join("\n");
+}
 async function shareBill(){
+ if(!clean($("upiId").value))toast("Tip: add your UPI ID so the message includes a pay link.");
  const d=billData();if(!d.rows.length)return toast("Add at least one item.");
  try{
-  const b=await billBlob(),f=new File([b],`Arakodi-Bill-${state.currentBillNo}.png`,{type:"image/png"}),text=`Arakodi Marinations bill: ${money(d.grandTotal)}. Scan the UPI QR in the attached bill to pay.`;
+  const b=await billBlob(),f=new File([b],`Arakodi-Bill-${state.currentBillNo}.png`,{type:"image/png"}),text=shareMessage(d);
   if(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]})){
    try{await navigator.share({title:"Arakodi Marinations Bill",text,files:[f]});return}
    catch(e){if(e.name==="AbortError")return;console.warn("Share sheet failed, using WhatsApp link",e)}
@@ -662,7 +679,7 @@ async function shareBill(){
   const u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);
   let p=clean($("customerPhone").value).replace(/\D/g,"");
   if(p.length===10)p="91"+p;
-  const wa=`https://wa.me/${p}?text=${encodeURIComponent(text+"\n\nAttach the downloaded bill image.")}`;
+  const wa=`https://wa.me/${p}?text=${encodeURIComponent(text)}`;
   toast("Bill image downloaded. Attach it in WhatsApp.");
   setTimeout(()=>{if(!window.open(wa,"_blank"))window.location.href=wa},600);
  }catch(e){if(e.name!=="AbortError")toast(e.message)}
