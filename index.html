@@ -653,18 +653,14 @@ async function downloadImage(){
 }
 function payLink(total){
  const upi=clean($("upiId").value);if(!upi)return "";
- const u=new URL("pay.html",location.href);u.search="";u.hash="";
- u.searchParams.set("pa",upi);
- u.searchParams.set("pn",clean($("payeeName").value)||"Arakodi Marinations");
- u.searchParams.set("am",total.toFixed(2));
- u.searchParams.set("bill",state.currentBillNo);
- return u.toString();
+ const payee=clean($("payeeName").value),amt=Number.isInteger(total)?String(total):total.toFixed(2);
+ let q=`a=${amt}&u=${encodeURIComponent(upi)}`;
+ if(payee&&payee!=="Arakodi Marinations")q+=`&n=${encodeURIComponent(payee)}`;
+ return new URL("p/",location.href.split(/[?#]/)[0].replace(/[^/]*$/,"")).toString()+"?"+q;
 }
 function shareMessage(d){
- const biz=clean($("businessName").value)||"Arakodi Marinations",upi=clean($("upiId").value),link=payLink(d.grandTotal);
- const lines=[`*${biz}*`,`Bill No: ${state.currentBillNo}`,`Amount: *${money(d.grandTotal)}*`];
- if(link)lines.push("",`Tap to pay by UPI: ${link}`,`UPI ID: ${upi}`);
- lines.push("","Thank you!");
+ const biz=clean($("businessName").value)||"Arakodi Marinations",link=payLink(d.grandTotal);
+ const lines=[`*${biz}*`,`Bill No: ${state.currentBillNo}`,"",link?`Pay *${money(d.grandTotal)}* 👉 ${link}`:`Amount: *${money(d.grandTotal)}*`,"","Thank you!"];
  return lines.join("\n");
 }
 async function shareBill(){

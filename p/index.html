@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pay Arakodi Marinations</title>
+<meta property="og:title" content="Tap to pay Arakodi Marinations">
+<meta property="og:description" content="Pay your bill with GPay, PhonePe, Paytm or any UPI app.">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+:root{--orange:#ff7600;--orange2:#d84c00;--ink:#2d1b0e;--muted:#795d48;--line:#ead6c3;--cream:#fff8ee;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:24px 16px;display:grid;place-items:center;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background-color:#fff4e6;background-image:linear-gradient(135deg,#fffaf3,#ffe8ce)}
+.card{width:min(400px,100%);background:#fff;border-radius:22px;overflow:hidden;border:1px solid #ebcbaa;box-shadow:0 16px 45px rgba(78,37,8,.14)}
+.head{padding:22px;color:#fff;background:linear-gradient(135deg,#8d2e00,#ff7600 58%,#ffae48)}
+.head h1{margin:0;font-size:22px;letter-spacing:-.03em}
+.head p{margin:4px 0 0;font-size:12px;opacity:.9}
+.body{padding:22px;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center}
+.amount{font-size:38px;font-weight:900;color:var(--orange2);font-variant-numeric:tabular-nums}
+.meta{font-size:13px;color:var(--muted);line-height:1.6}
+.pay{display:block;width:100%;padding:15px;border-radius:14px;background:linear-gradient(135deg,var(--orange),var(--orange2));color:#fff;font-weight:900;font-size:17px;text-decoration:none;box-shadow:0 8px 18px rgba(216,76,0,.25)}
+.pay:focus-visible,.copy:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+#qrcode{padding:8px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.upi{display:flex;gap:8px;align-items:center;width:100%;padding:10px 12px;background:var(--cream);border:1px solid var(--line);border-radius:12px;font-size:14px}
+.upi span{flex:1;min-width:0;word-break:break-all;text-align:left;font-weight:700}
+.copy{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 10px;font:inherit;font-size:12px;font-weight:800;cursor:pointer;color:var(--ink)}
+.note{font-size:11px;color:var(--muted)}
+.error{color:#c63d31;font-weight:700}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="head"><h1 id="biz">Arakodi Marinations</h1><p id="billNo">Payment request</p></div>
+  <div class="body" id="content">
+    <div class="amount" id="amount"></div>
+    <div class="meta" id="meta"></div>
+    <a class="pay" id="payBtn" href="#">Pay with UPI app</a>
+    <div class="note">Opens GPay, PhonePe, Paytm or any UPI app with the amount filled in.</div>
+    <div id="qrcode"></div>
+    <div class="note">On a computer? Scan this QR with your phone.</div>
+    <div class="upi"><span id="upiText"></span><button class="copy" id="copyBtn" type="button">Copy UPI ID</button></div>
+  </div>
+</main>
+<script>
+const q=new URLSearchParams(location.search);
+const pa=(q.get("u")||q.get("pa")||"").trim(),pn=(q.get("n")||q.get("pn")||"Arakodi Marinations").trim(),am=Number(q.get("a")||q.get("am")||0),bill=(q.get("b")||q.get("bill")||"").trim();
+const $=id=>document.getElementById(id);
+if(!pa){
+  $("content").innerHTML='<p class="error">This payment link is missing the UPI ID. Ask the shop to resend the bill.</p>';
+}else{
+  const amt=am>0?am.toFixed(2):"";
+  const upi=`upi://pay?pa=${encodeURIComponent(pa)}&pn=${encodeURIComponent(pn)}${amt?`&am=${amt}`:""}&cu=INR&tn=${encodeURIComponent(bill?`Arakodi bill ${bill}`:"Arakodi Marinations Order")}`;
+  $("biz").textContent=pn;
+  $("billNo").textContent=bill?`Bill No: ${bill}`:"Payment request";
+  $("amount").textContent=amt?"₹"+Number(amt).toLocaleString("en-IN",{minimumFractionDigits:2}):"Enter amount in app";
+  $("meta").textContent=`Paying ${pn}`;
+  $("payBtn").href=upi;
+  $("upiText").textContent=pa;
+  if(typeof QRCode!=="undefined")new QRCode($("qrcode"),{text:upi,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});
+  else $("qrcode").hidden=true;
+  $("copyBtn").onclick=async()=>{
+    try{await navigator.clipboard.writeText(pa);$("copyBtn").textContent="Copied"}
+    catch{const r=document.createRange();r.selectNodeContents($("upiText"));const s=getSelection();s.removeAllRanges();s.addRange(r)}
+  };
+}
+</script>
+</body>
+</html>
